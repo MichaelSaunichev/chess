@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chessboard</title>
+    <style>
+        .buttons_container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .side_buttons, .difficulty_buttons {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .center_input {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .board_container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 80vh;
+        }
+
+        .chessboard {
+            display: grid;
+            grid-template-columns: repeat(8, 50px);
+        }
+
+        .square {
+            width: 50px;
+            height: 50px;
+            background-color: white;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            flex-direction: column;
+        }
+
+        .top_left_label{
+            font-size: 10px;
+            color: #333;
+            position: absolute;
+            top: 0; /* Align to the bottom */
+            left: 0; /* Align to the right */
+        }
+
+        .bottom_right_label{
+            font-size: 10px;
+            color: #333;
+            position: absolute;
+            bottom: 0; /* Align to the bottom */
+            right: 0; /* Align to the right */
+        }
+
+        .even {
+            background-color: #eee;
+        }
+
+        .piece {
+            position: absolute;
+            width: 80%;
+            height: 80%;
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+
+        .white.p {
+            background-image: url('/static/white_pawn.png');
+        }
+        .black.p {
+            background-image: url('/static/black_pawn.png');
+        }
+
+        .white.r {
+            background-image: url('/static/white_rook.png');
+        }
+        .black.r {
+            background-image: url('/static/black_rook.png');
+        }
+
+        .white.b {
+            background-image: url('/static/white_bishop.png');
+        }
+        .black.b {
+            background-image: url('/static/black_bishop.png');
+        }
+
+        .white.n {
+            background-image: url('/static/white_knight.png');
+        }
+        .black.n {
+            background-image: url('/static/black_knight.png');
+        }
+
+        .white.q {
+            background-image: url('/static/white_queen.png');
+        }
+        .black.q {
+            background-image: url('/static/black_queen.png');
+        }
+
+        .white.k {
+            background-image: url('/static/white_king.png');
+        }
+        .black.k {
+            background-image: url('/static/black_king.png');
+        }
+    </style>
+</head>
+
+<body>
+    <div class="board_container">
+        <div class="chessboard" id="chessboard"></div>
+    </div>
+
+    <div id="move_input_box" class = "center_input" style="display: none;">
+        <label for="piece_position">Enter piece type ('p','n','b','r','q',or 'k') with its position followed by a space and the next position (e.g. 'pe2 e4')<br>
+            For pawn promotions additionally enter a space and the promotion piece type (e.g. 'pe7 e8 q')<br><br></label>
+        <input type="text" id="piece_position" />
+        <button onclick="add_pieces_user()">Make Move</button>
+    </div>
+
+    <div class="buttons_container">
+        <div id="side_selection" class = "side_buttons">
+            <button onclick="choose_side('white')">White</button>
+            <button onclick="choose_side('black')">Black</button>
+        </div>
+        <div id="difficulty_selection" class = "difficulty_buttons" style="display:none;">
+            <button onclick="choose_difficulty('easy')">Easy</button>
+            <button onclick="choose_difficulty('medium')">Medium</button>
+            <button onclick="choose_difficulty('hard')">Hard</button>
+        </div>
+    </div>
+    
+
+    <script>
+        const chessboard = document.getElementById("chessboard");
+        var user_side = 1;
+        let resetRequested = false;
+
+        for (let row = 0; row < 8; row++) {
+            for (let col = 0; col < 8; col++) {
+                const square = document.createElement("div");
+                square.className = "square";
+                square.dataset.position = String.fromCharCode(97 + col) + (8 - row);
+                if ((row + col) % 2 === 0) {
+                    square.classList.add("even");
+                }
+                chessboard.appendChild(square);
+            }
+        }
+
+        function extract_piece_position(piece) {
+            const pieceType = piece.substring(0, 1);
+            const position = piece.substring(1,3);
+            return [pieceType, position];
+        }
+
+        function flip_piece(piece_string) {
+            const column_map = {
+                'a': 'h',
+                'b': 'g',
+                'c': 'f',
+                'd': 'e',
+                'e': 'd',
+                'f': 'c',
+                'g': 'b',
+                'h': 'a'
+            };
+
+            const new_column = column_map[piece_string[0]];
+            const new_row = 9 - parseInt(piece_string[1]);
+            const new_position_string = new_column + new_row;
+            return new_position_string;
+        }
+
+        function addPiece(type, side, position) {
+            const piece = document.createElement("div");
+            piece.className = `piece ${side} ${type}`;
+            const square = document.querySelector(`.square[data-position="${position}"]`);
+            square.appendChild(piece);
+        }
+
+        function create_labels(side){
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    var square_position = String.fromCharCode(97 + col) + (8 - row);
+                    const square = document.querySelector(`.square[data-position="${square_position}"]`);
+                    if (square) {
+                        if(col === 0){
+                            if(side){
+                                square_position = flip_piece(square_position)
+                            }
+                            const label = document.createElement("div");
+                            label.className = "top_left_label";
+                            label.textContent = square_position[1];
+                            square.appendChild(label);
+                        }
+                        if(row === 7){
+                            if(side && col !== 0){
+                                square_position = flip_piece(square_position)
+                            }
+                            const label = document.createElement("div");
+                            label.className = "bottom_right_label";
+                            label.textContent = square_position[0];
+                            square.appendChild(label);
+                        }
+                    }
+                }
+            }
+        }
+
+        function clearBoard(new_game) {
+            const squares = document.querySelectorAll(".square");
+            squares.forEach(square => {
+                const piece = square.querySelector(".piece");
+                if (piece) {
+                    square.removeChild(piece);
+                }
+            });
+            if(new_game){
+                squares.forEach(square => {
+                    while (square.firstChild) {
+                        square.removeChild(square.firstChild);
+                    }
+                });
+            }
+
+            //Clear the 'pieces' object
+            //pieces = {};
+        }
+
+        function game_over_test(end) {
+            if (end[0] === 1){
+                resetRequested = 1;
+                //Hide move input box
+                document.getElementById('move_input_box').style.display = 'none';
+
+                setTimeout(function(){
+                    alert("checkmate");
+                    const replay = confirm("Would you like to replay?");
+                    if(replay){
+                        reset_game(0);
+                    }
+                }, 500)
+            }
+            if (end[1] === 1){
+                resetRequested = 1;
+                //Hide move input box
+                document.getElementById('move_input_box').style.display = 'none';
+                setTimeout(function(){
+                    alert("stalemate");
+                    const replay = confirm("Would you like to replay?");
+                    if(replay){
+                        reset_game(0);
+                    }
+                }, 500)
+            }
+        }
+
+        function reset_game(refresh){
+            fetch('/reset_game', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw Error('Request failed with status ' + response.status);
+                    alert("Error reset");
+                }
+                return response.text();
+            })
+            .then(data => {
+                if(!refresh){
+                    //Show buttons
+                    document.getElementById('side_selection').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                //alert("Error reset");
+            });
+        }
+
+        function choose_side(side) {
+            reset_game(1)
+            resetRequested = 0;
+
+            //Hide side buttons
+            document.getElementById('side_selection').style.display = 'none';
+
+            fetch('/choose_side', {
+                method: 'POST',
+                body: JSON.stringify({side: side}),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw Error('Request failed with status ' + response.status);
+                    alert("Error side");
+                }
+                return response.text();
+            })
+            .then(data => {
+                if (side === "white"){
+                    user_side = 0;
+                }
+                else{
+                    user_side = 1;
+                }
+                document.getElementById('difficulty_selection').style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                //alert("Error side");
+            });
+        }
+
+        function choose_difficulty(difficulty){
+            document.getElementById('difficulty_selection').style.display = 'none';
+            fetch('/choose_difficulty', {
+                method: 'POST',
+                body: JSON.stringify({difficulty: difficulty}),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw Error('Request failed with status ' + response.status);
+                    alert("Error difficulty");
+                }
+                return response.text();
+            })
+            .then(data => {
+                display_start(user_side);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                //alert("Error difficulty");
+            });
+        }
+
+        function display_start(side){
+            clearBoard(1);
+            create_labels(side);
+            var bottom_pieces
+            var top_pieces
+            if (side){
+                bottom_pieces = "black"
+                top_pieces = "white"
+            }
+            else{
+                bottom_pieces = "white"
+                top_pieces = "black"
+            }
+            const white_pieces_array = ["ra1","nb1","bc1","qd1","ke1","bf1","ng1","rh1",
+            "pa2","pb2","pc2","pd2","pe2","pf2","pg2","ph2"]
+            const black_pieces_array = ["ra8","nb8","bc8","qd8","ke8","bf8","ng8","rh8",
+            "pa7","pb7","pc7","pd7","pe7","pf7","pg7","ph7"]
+            white_pieces_array.forEach(piece => {
+                const [pieceType, position] = extract_piece_position(piece);
+                let new_position = position
+                if (side){
+                    new_position = flip_piece(position)
+                }
+                addPiece(pieceType, "white", new_position);
+            });
+
+            black_pieces_array.forEach(piece => {
+                const [pieceType, position] = extract_piece_position(piece);
+                let new_position = position
+                if (side){
+                    new_position = flip_piece(position)
+                }
+                addPiece(pieceType, "black", new_position);
+            });
+
+            //Show the move input box
+            document.getElementById('move_input_box').style.display = 'block';
+        }
+
+        function add_pieces_user() {
+            //Hide move input box
+            document.getElementById('move_input_box').style.display = 'none';
+            const piece_position_input = document.getElementById("piece_position");
+            const position = piece_position_input.value.toLowerCase();
+
+            fetch('/move_user?position=' + position, {
+                method: 'GET',
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Request failed with status ' + response.status);
+                    alert("Error user");
+                }
+                return response.json();
+            })
+            .then(data => {
+                const end = data.end;
+                const white_pieces_array = data.white_pieces;
+                const black_pieces_array = data.black_pieces;
+
+                if (data.error != "none") {
+                    const errorType = data.error;
+                    alert("Error: " + errorType);
+                    //Show move input box
+                    document.getElementById('move_input_box').style.display = 'block';
+                    return;
+                }
+
+                clearBoard(0);
+
+                white_pieces_array.forEach(piece => {
+                    const [pieceType, position] = extract_piece_position(piece);
+                    let new_position = position
+                    if (user_side){
+                        new_position = flip_piece(position)
+                    }
+                    addPiece(pieceType, "white", new_position);
+                });
+
+                black_pieces_array.forEach(piece => {
+                    const [pieceType, position] = extract_piece_position(piece);
+                    let new_position = position
+                    if (user_side){
+                        new_position = flip_piece(position)
+                    }
+                    addPiece(pieceType, "black", new_position);
+                });
+                game_over_test(end);
+                if(!resetRequested){
+                    add_pieces_computer();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                //alert("Error user");
+            });
+        }
+
+        function add_pieces_computer() {
+
+            fetch('/move_computer', {
+                method: 'GET',
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Request failed with status ' + response.status);
+                    alert("Error computer")
+                }
+                return response.json();
+            })
+            .then(data => {
+                const end = data.end
+                const white_pieces_array = data.white_pieces;
+                const black_pieces_array = data.black_pieces;
+
+                clearBoard(0);
+
+                white_pieces_array.forEach(piece => {
+                    const [pieceType, position] = extract_piece_position(piece);
+                    let new_position = position
+                    if (user_side){
+                        new_position = flip_piece(position)
+                    }
+                    addPiece(pieceType, "white", new_position);
+                });
+
+                black_pieces_array.forEach(piece => {
+                    const [pieceType, position] = extract_piece_position(piece);
+                    let new_position = position
+                    if (user_side){
+                        new_position = flip_piece(position)
+                    }
+                    addPiece(pieceType, "black", new_position);
+                });
+                game_over_test(end);
+                if(!resetRequested){
+                    // Show the move input box
+                    document.getElementById('move_input_box').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                //alert("Error computer")
+            });
+        }
+    </script>
+</body>
+</html>
