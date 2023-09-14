@@ -1,1 +1,1 @@
-# chess_project
+personal project - made a full stack chess program using python for the backend with a flask framework to connect to a javascript/html front end. Did not use imported libraries for python backend so code for move validation, making moves, etc. was all personally developed
